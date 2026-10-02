@@ -1,0 +1,5 @@
+{
+  "ar": { "name": "العربية", "dir": "rtl", "fallback": "en" },
+  "en": { "name": "English", "dir": "ltr", "fallback": null },
+  "ckb": { "name": "کوردی", "dir": "rtl", "fallback": "ar" }
+}
