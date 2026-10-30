@@ -40,13 +40,9 @@ python3 -m http.server 8000
 
 ## النشر على GitHub Pages
 
-الملف `.github/workflows/main.yml` يشغّل الاختبارات عند كل push، وينشر الموقع عند الـ push إلى الفرع الافتراضي.
+GitHub Pages مفعّل على هذا المستودع وينشر الموقع مباشرة من جذر الفرع الافتراضي (**Settings → Pages → Deploy from a branch**). أي push إلى الفرع يحدّث الموقع خلال دقيقة أو اثنتين. يوجد ملف `.nojekyll` حتى تُنشر الملفات كما هي.
 
-1. في GitHub: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-2. ادمج هذا الفرع في الفرع الافتراضي (أو اجعله الفرع الافتراضي).
-3. بعد نجاح الـ workflow يظهر الرابط في صفحة Actions وفي إعدادات Pages.
-
-بديل بدون Actions: **Source: Deploy from a branch** واختر الفرع والمجلد `/ (root)`؛ الموقع يعمل من الجذر مباشرة (يوجد `.nojekyll`).
+الملف `.github/workflows/main.yml` يشغّل الاختبارات وفحص الترجمات عند كل push.
 
 ## هيكل المستودع
 
