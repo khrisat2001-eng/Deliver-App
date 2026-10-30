@@ -1,1 +1,63 @@
+name: Test and deploy to GitHub Pages
 
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: packages/core/package-lock.json
+      - name: Install
+        run: npm ci
+        working-directory: packages/core
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: packages/core
+      - name: Unit tests
+        run: npm test
+        working-directory: packages/core
+      - name: Compiled core in assets/js/core is up to date
+        run: |
+          npm run build:site
+          git diff --exit-code -- ../../assets/js/core
+        working-directory: packages/core
+      - name: Translations
+        run: node scripts/check-i18n.mjs
+
+  deploy:
+    # Publish only from the default branch (GitHub Pages environments allow that branch by default)
+    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect the static site
+        run: |
+          mkdir _site
+          cp -r index.html passenger.html driver.html admin.html .nojekyll assets _site/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

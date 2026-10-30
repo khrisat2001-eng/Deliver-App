@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ride — Iraq Ride Hailing</title>
+  <meta name="description" content="Ride-hailing platform demo for Iraq and Kurdistan: passenger app, driver app and admin dashboard, running fully in the browser.">
+  <meta name="theme-color" content="#4338ca">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body>
+  <div class="landing">
+    <div class="row between">
+      <div class="row" style="font-weight:800;font-size:1.2rem">🚕 <span data-i18n="app.name">Ride</span></div>
+      <select id="lang" class="input lang" aria-label="Language">
+        <option value="ar">العربية</option>
+        <option value="ckb">کوردی</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+
+    <section class="hero">
+      <h1 data-i18n="landing.title">A ride-hailing platform for Iraq and Kurdistan</h1>
+      <p class="text-2" data-i18n="landing.subtitle"></p>
+    </section>
+
+    <div class="app-cards">
+      <a class="card app-card" href="passenger.html">
+        <span class="emoji">🙋</span>
+        <h2 data-i18n="app.passenger">Passenger app</h2>
+        <p class="text-2" data-i18n="landing.passenger_desc"></p>
+        <span class="btn primary" data-i18n="landing.open">Open</span>
+      </a>
+      <a class="card app-card" href="driver.html">
+        <span class="emoji">🧑‍✈️</span>
+        <h2 data-i18n="app.driver">Driver app</h2>
+        <p class="text-2" data-i18n="landing.driver_desc"></p>
+        <span class="btn primary" data-i18n="landing.open">Open</span>
+      </a>
+      <a class="card app-card" href="admin.html">
+        <span class="emoji">🛡️</span>
+        <h2 data-i18n="app.admin">Admin dashboard</h2>
+        <p class="text-2" data-i18n="landing.admin_desc"></p>
+        <span class="btn primary" data-i18n="landing.open">Open</span>
+      </a>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <h3 data-i18n="landing.how_title">Try a full trip</h3>
+        <ol class="steps">
+          <li data-i18n="landing.how_1"></li>
+          <li data-i18n="landing.how_2"></li>
+          <li data-i18n="landing.how_3"></li>
+          <li data-i18n="landing.how_4"></li>
+          <li data-i18n="landing.how_5"></li>
+        </ol>
+      </div>
+      <div class="card col">
+        <h3 data-i18n="landing.accounts">Demo accounts</h3>
+        <div class="kv">
+          <span data-i18n="landing.rider_acc">Rider</span><span class="ltr">0750 000 0000</span>
+          <span data-i18n="landing.driver_acc">Driver</span><span class="ltr">0750 111 1111</span>
+        </div>
+        <small class="muted" data-i18n="landing.admin_acc"></small>
+        <div class="sep"></div>
+        <h3 data-i18n="landing.limits_title">Limits</h3>
+        <p class="text-2" data-i18n="landing.limits_text"></p>
+        <a href="https://github.com/khrisat2001-eng/Deliver-App/tree/HEAD/docs" target="_blank" rel="noopener" data-i18n="landing.docs">Design documents</a>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initI18n, t, setLocale, getLocale } from './assets/js/lib/i18n.js';
+    await initI18n();
+    for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
+    const sel = document.getElementById('lang');
+    sel.value = getLocale();
+    sel.addEventListener('change', () => { setLocale(sel.value); location.reload(); });
+  </script>
+</body>
+</html>
