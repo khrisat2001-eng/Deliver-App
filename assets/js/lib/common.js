@@ -4,11 +4,36 @@ import { startLoop, AppError } from './engine.js';
 import { toast, money, h } from './ui.js';
 
 let leader = false;
+
+// ── Installable app (PWA) ──
+let deferredInstall = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstall = e; });
+
+export function registerServiceWorker() {
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+/** "Install the app" card for the account tab; null when already installed. */
+export function installCard() {
+  if (isStandalone()) return null;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  return h('div', { class: 'card col' }, h('h3', {}, '📲 ', t('pwa.title')),
+    h('p', { class: 'text-2' }, t(ios ? 'pwa.ios_hint' : 'pwa.text')),
+    ios ? null : h('button', { class: 'btn primary', onclick: async () => {
+      if (!deferredInstall) { toast(t('pwa.manual_hint')); return; }
+      deferredInstall.prompt();
+      await deferredInstall.userChoice;
+      deferredInstall = null;
+    } }, t('pwa.install')));
+}
 export const isLeader = () => leader;
 
 /** Load translations, seed the demo database on first visit and start the shared simulation loop. */
 export async function boot() {
   await initI18n();
+  registerServiceWorker();
   const seeded = ensureSeed();
   leader = heartbeat();
   setInterval(() => { leader = heartbeat(); }, 1000);

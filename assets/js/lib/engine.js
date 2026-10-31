@@ -547,9 +547,53 @@ export function verifyOtp(phone, code) {
   otps.delete(phone);
 }
 
+// ── Email + password (PBKDF2-SHA256 via Web Crypto; only the salt and hash are stored) ──
+const PBKDF2_ITER = 150_000;
+const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+async function derive(password, salt, iter) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  return b64(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: iter }, key, 256));
+}
+
+const normEmail = (e) => String(e ?? '').trim().toLowerCase();
+
+export async function setPassword(customerId, password, currentPassword) {
+  if (String(password).length < 8) throw new AppError('err.weak_password');
+  const c = read('customers').find((x) => x.id === customerId);
+  if (!c?.email) throw new AppError('err.need_email');
+  if (c.pwd && currentPassword !== undefined && (await derive(currentPassword, unb64(c.pwd.salt), c.pwd.iter)) !== c.pwd.hash) throw new AppError('err.bad_login');
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const pwd = { salt: b64(salt), iter: PBKDF2_ITER, hash: await derive(password, salt, PBKDF2_ITER) };
+  tx((S) => { S.customers.find((x) => x.id === customerId).pwd = pwd; });
+}
+
+export async function loginWithEmail(email, password) {
+  const c = read('customers').find((x) => x.email && normEmail(x.email) === normEmail(email) && x.status !== 'DELETED');
+  // same error whether the email exists or not, so the form doesn't reveal accounts
+  if (!c?.pwd || (await derive(password, unb64(c.pwd.salt), c.pwd.iter)) !== c.pwd.hash) throw new AppError('err.bad_login');
+  if (c.status !== 'ACTIVE') throw new AppError('err.account_inactive');
+  return c;
+}
+
+/** Demo "forgot password": returns the code that production would email. */
+export function sendResetCode(email) {
+  return sendOtp(`reset:${normEmail(email)}`);
+}
+
+export async function resetPassword(email, code, password) {
+  verifyOtp(`reset:${normEmail(email)}`, code);
+  const c = read('customers').find((x) => x.email && normEmail(x.email) === normEmail(email) && x.status !== 'DELETED');
+  if (!c) throw new AppError('err.bad_login');
+  await setPassword(c.id, password);
+  return c;
+}
+
 export function registerCustomer({ phone, name, email, birthDate, gender, address, referralCode }) {
   return tx((S) => {
     if (S.customers.some((c) => c.phone === phone)) throw new AppError('err.exists');
+    if (email && S.customers.some((c) => c.email && normEmail(c.email) === normEmail(email))) throw new AppError('err.email_taken');
     let referredBy = null;
     if (referralCode) {
       const ref = S.customers.find((c) => c.referralCode === referralCode.trim().toUpperCase());
@@ -557,7 +601,7 @@ export function registerCustomer({ phone, name, email, birthDate, gender, addres
       referredBy = ref.id;
     }
     const c = {
-      id: uid('c'), phone, name: name.trim().slice(0, 80), email: email?.trim() || null, birthDate: birthDate || null, gender: gender || 'UNSPECIFIED',
+      id: uid('c'), phone, name: name.trim().slice(0, 80), email: normEmail(email) || null, birthDate: birthDate || null, gender: gender || 'UNSPECIFIED',
       address: address?.trim() || '', photo: null, emergency: [], saved: {}, referralCode: `R${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
       referredBy, rating: 5, ratingCount: 0, trips: 0, cancelled: 0, status: 'ACTIVE', cityId: 'erbil', createdAt: now(), blockedDrivers: [],
     };

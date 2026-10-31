@@ -82,6 +82,7 @@
     const sel = document.getElementById('lang');
     sel.value = getLocale();
     sel.addEventListener('change', () => { setLocale(sel.value); location.reload(); });
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
   </script>
 </body>
 </html>

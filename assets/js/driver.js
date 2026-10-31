@@ -1,5 +1,5 @@
 // Driver app
-import { boot, attempt, notificationText, watchNotifications, initials, readSession, writeSession, changeLanguage, relayout } from './lib/common.js';
+import { boot, installCard, attempt, notificationText, watchNotifications, initials, readSession, writeSession, changeLanguage, relayout } from './lib/common.js';
 import { t, tr } from './lib/i18n.js';
 import { h, mount, money, km, minutes, dateTime, toast, modal, confirmBox, field, select, badge, langSwitcher, fileToThumb, num } from './lib/ui.js';
 import { read, onChange } from './lib/db.js';
@@ -115,6 +115,8 @@ function registerWizard(phone, body) {
 }
 
 function login(id) {
+  // always land on the main screen, whatever tab the previous session ended on
+  st.tab = 'home';
   st.driverId = id;
   writeSession(SKEY, id);
   renderShell();
@@ -548,6 +550,7 @@ function renderAccount(page, d) {
       h('div', { class: 'card kpi' }, h('span', { class: 'label' }, t('driver.acceptance')), h('span', { class: 'value' }, `${num(acc)}%`)),
       h('div', { class: 'card kpi' }, h('span', { class: 'label' }, t('driver.cancellation')), h('span', { class: 'value' }, `${num(cancellationRate(d.cancelled, total), 1)}%`)),
       h('div', { class: 'card kpi' }, h('span', { class: 'label' }, t('driver.total_trips')), h('span', { class: 'value' }, num(d.trips)))),
+    installCard(),
     h('div', { class: 'card col' }, h('h3', {}, '🚘 ', t('driver.vehicle')),
       h('div', { class: 'kv' }, h('span', {}, t('driver.vehicle_class')), h('span', {}, `${vt?.icon ?? ''} ${tr(vt?.name)}`), h('span', {}, t('driver.car')), h('span', {}, `${d.vehicle.make} ${d.vehicle.model} ${d.vehicle.year}`),
         h('span', {}, t('driver.color')), h('span', {}, tr(d.vehicle.color)), h('span', {}, t('driver.plate')), h('span', {}, h('span', { class: 'plate' }, d.vehicle.plate)),

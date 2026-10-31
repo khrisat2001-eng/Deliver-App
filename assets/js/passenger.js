@@ -1,5 +1,5 @@
 // Passenger app
-import { boot, attempt, notificationText, watchNotifications, initials, readSession, writeSession, changeLanguage, relayout } from './lib/common.js';
+import { boot, installCard, attempt, notificationText, watchNotifications, initials, readSession, writeSession, changeLanguage, relayout } from './lib/common.js';
 import { t, tr } from './lib/i18n.js';
 import { h, mount, money, km, minutes, dateTime, toast, modal, confirmBox, field, select, badge, stars, langSwitcher, fileToThumb, num } from './lib/ui.js';
 import { read, onChange } from './lib/db.js';
@@ -44,6 +44,7 @@ function renderAuth() {
       field(t('auth.enter_phone'), input, t('auth.phone_hint')),
       h('button', { class: 'btn primary lg block', onclick: () => attempt(() => { phone = E.normalizePhone(input.value); otpStep(E.sendOtp(phone)); }) }, t('common.continue')),
       h('button', { class: 'btn ghost block', onclick: () => attempt(() => { phone = '+9647500000000'; otpStep(E.sendOtp(phone)); }) }, t('auth.demo_login')),
+      h('button', { class: 'btn block', onclick: emailStep }, '✉️ ', t('auth.email_login')),
       h('div', { class: 'sep' }),
       h('div', { class: 'row between' }, h('a', { href: './' }, `← ${t('app.home')}`), langSwitcher(changeLanguage)),
     );
@@ -71,24 +72,63 @@ function renderAuth() {
     input.addEventListener('keydown', (e) => e.key === 'Enter' && verify());
     input.focus();
   };
+  const emailStep = () => {
+    const email = h('input', { class: 'input ltr', type: 'email', autocomplete: 'username' });
+    const pw = h('input', { class: 'input ltr', type: 'password', autocomplete: 'current-password' });
+    const go = () => attempt(async () => login((await E.loginWithEmail(email.value, pw.value)).id));
+    pw.addEventListener('keydown', (e) => e.key === 'Enter' && go());
+    mount(body,
+      h('h2', {}, t('auth.email_login')),
+      field(t('profile.email'), email), field(t('auth.password'), pw),
+      h('button', { class: 'btn primary lg block', onclick: go }, t('auth.sign_in')),
+      h('div', { class: 'row wrap' },
+        h('button', { class: 'btn sm', onclick: () => forgotStep(email.value) }, t('auth.forgot')),
+        h('button', { class: 'btn sm ghost', onclick: phoneStep }, t('auth.use_phone'))),
+      h('small', { class: 'muted' }, t('auth.email_hint')));
+    email.focus();
+  };
+  const forgotStep = (prefill = '') => {
+    const email = h('input', { class: 'input ltr', type: 'email', value: prefill });
+    const box = h('div', { class: 'col' });
+    mount(body, h('h2', {}, t('auth.forgot_title')), field(t('profile.email'), email),
+      h('button', { class: 'btn primary block', onclick: () => {
+        if (!/^\S+@\S+\.\S+$/.test(email.value.trim())) { toast(t('err.fill_all'), 'error'); return; }
+        const code = E.sendResetCode(email.value);
+        const otp = h('input', { class: 'input otp', inputmode: 'numeric', maxlength: 6 });
+        const pw = h('input', { class: 'input ltr', type: 'password', autocomplete: 'new-password' });
+        mount(box, h('div', { class: 'notice' }, t('auth.reset_sent', { code })), field(t('auth.otp_title'), otp), field(t('auth.new_password'), pw, t('auth.password_hint')),
+          h('button', { class: 'btn primary lg block', onclick: () => attempt(async () => {
+            const c = await E.resetPassword(email.value, otp.value, pw.value);
+            toast(t('auth.reset_done'), 'good');
+            login(c.id);
+          }) }, t('common.save')));
+      } }, t('auth.send_code')),
+      box, h('button', { class: 'btn ghost', onclick: emailStep }, t('common.back')));
+    email.focus();
+  };
   const registerStep = () => {
     const name = h('input', { class: 'input', autocomplete: 'name' });
     const email = h('input', { class: 'input ltr', type: 'email', autocomplete: 'email' });
     const birth = h('input', { class: 'input', type: 'date' });
     const gender = select([['UNSPECIFIED', t('gender.UNSPECIFIED')], ['MALE', t('gender.MALE')], ['FEMALE', t('gender.FEMALE')]], 'UNSPECIFIED');
     const ref = h('input', { class: 'input ltr', placeholder: 'DEMO2026' });
+    const pw = h('input', { class: 'input ltr', type: 'password', autocomplete: 'new-password' });
     const terms = h('input', { type: 'checkbox' });
     mount(body,
       h('h2', {}, t('auth.create_account')),
       field(t('profile.name'), name),
       field(`${t('profile.email')} (${t('common.optional')})`, email),
+      field(`${t('auth.password')} (${t('common.optional')})`, pw, t('auth.password_hint')),
       h('div', { class: 'grid grid-2' }, field(`${t('profile.birth')} (${t('common.optional')})`, birth), field(t('profile.gender'), gender)),
       field(`${t('auth.referral')} (${t('common.optional')})`, ref),
       h('label', { class: 'check' }, terms, t('auth.terms')),
-      h('button', { class: 'btn primary lg block', onclick: () => attempt(() => {
+      h('button', { class: 'btn primary lg block', onclick: () => attempt(async () => {
         if (name.value.trim().length < 2) throw new E.AppError('err.name_required');
+        if (pw.value && !email.value.trim()) throw new E.AppError('err.need_email');
+        if (pw.value && pw.value.length < 8) throw new E.AppError('err.weak_password');
         if (!terms.checked) throw new E.AppError('err.terms');
         const c = E.registerCustomer({ phone, name: name.value, email: email.value, birthDate: birth.value, gender: gender.value, referralCode: ref.value });
+        if (pw.value) await E.setPassword(c.id, pw.value);
         login(c.id);
       }) }, t('auth.create_account')),
     );
@@ -99,6 +139,10 @@ function renderAuth() {
 }
 
 function login(id) {
+  // always land on the main screen, whatever tab the previous session ended on
+  st.tab = 'ride';
+  st.stage = 'home';
+  st.quote = null;
   st.customerId = id;
   writeSession(SKEY, id);
   map = null;
@@ -679,10 +723,12 @@ function renderAccountTab(page, c) {
     h('div', { class: 'card col' },
       h('button', { class: 'list-item', onclick: () => profileModal(c) }, '✏️ ', t('account.edit_profile')),
       h('button', { class: 'list-item', onclick: () => changePhoneModal(c) }, '📱 ', t('account.change_phone')),
+      h('button', { class: 'list-item', onclick: () => passwordModal(c) }, '🔑 ', t(c.pwd ? 'account.change_password' : 'account.set_password')),
       h('button', { class: 'list-item', onclick: () => savedPlacesModal(c) }, '📍 ', t('account.saved_places')),
       h('button', { class: 'list-item', onclick: () => emergencyModal(c) }, '🆘 ', t('account.emergency_contacts')),
       h('button', { class: 'list-item', onclick: () => supportModal() }, '🎧 ', t('account.support')),
       h('button', { class: 'list-item', onclick: showNotifications }, '🔔 ', t('nav.notifications'))),
+    installCard(),
     h('div', { class: 'card' }, h('h3', {}, '🎁 ', t('account.referral')), h('p', { class: 'text-2' }, t('account.referral_text', { amount: money(read('settings').refereeBonus) })),
       h('div', { class: 'row' }, h('span', { class: 'plate grow center', style: { fontSize: '1.2rem' } }, c.referralCode),
         h('button', { class: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(t('account.referral_share', { code: c.referralCode })); toast(t('trip.share_copied'), 'good'); } catch { /* ignore */ } } }, t('common.copy')))),
@@ -709,8 +755,23 @@ function profileModal(c) {
   [{ label: t('common.cancel'), value: () => null }, { label: t('common.save'), kind: 'primary', value: () => true }]).then((ok) => {
     if (!ok) return;
     if (name.value.trim().length < 2) return toast(t('err.name_required'), 'error');
-    E.updateCustomer(c.id, (x) => Object.assign(x, { name: name.value.trim().slice(0, 80), email: email.value.trim() || null, birthDate: birth.value || null, gender: gender.value, address: addr.value.trim(), photo }));
+    const newEmail = email.value.trim().toLowerCase() || null;
+    if (newEmail && read('customers').some((x) => x.id !== c.id && x.email?.toLowerCase() === newEmail)) return toast(t('err.email_taken'), 'error');
+    if (!newEmail && c.pwd) return toast(t('err.email_needed_for_password'), 'error');
+    E.updateCustomer(c.id, (x) => Object.assign(x, { name: name.value.trim().slice(0, 80), email: newEmail, birthDate: birth.value || null, gender: gender.value, address: addr.value.trim(), photo }));
     renderPage();
+  });
+}
+
+function passwordModal(c) {
+  if (!c.email) { toast(t('err.need_email'), 'error'); return profileModal(c); }
+  const cur = h('input', { class: 'input ltr', type: 'password', autocomplete: 'current-password' });
+  const pw = h('input', { class: 'input ltr', type: 'password', autocomplete: 'new-password' });
+  modal(t(c.pwd ? 'account.change_password' : 'account.set_password'), h('div', { class: 'col' },
+    h('small', { class: 'muted' }, t('account.password_for', { email: c.email })),
+    c.pwd ? field(t('account.current_password'), cur) : null, field(t('auth.new_password'), pw, t('auth.password_hint'))),
+  [{ label: t('common.cancel'), value: () => null }, { label: t('common.save'), kind: 'primary', value: () => true }]).then((ok) => {
+    if (ok) attempt(async () => { await E.setPassword(c.id, pw.value, c.pwd ? cur.value : undefined); toast(t('account.password_set'), 'good'); renderPage(); });
   });
 }
 
